@@ -1,4 +1,3 @@
-import random
 from flask import Flask, jsonify, request
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -7,8 +6,6 @@ from pyvi import ViTokenizer
 import seaborn as sns
 import pandas as pd
 import numpy as np
-from zipfile import ZipFile
-from pathlib import Path
 import tensorflow as tf
 import matplotlib.pyplot as plt
 from tensorflow import keras
