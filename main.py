@@ -36,6 +36,11 @@ users = pd.DataFrame()
 app = Flask(__name__)
 
 
+@app.route("/", methods={"GET"})
+def home():
+    return "Xin chào tôi là ndkhangvl"
+
+
 @app.route("/test", methods=["GET"])
 def test():
     response = requests.get("http://127.0.0.1:8000/place")
@@ -71,6 +76,7 @@ def recommend_tourism():
 
         # else:
         #     print("Failed to retrieve JSON data from the API.")
+
         global info_tourism, tourism_rating, users
         if info_tourism.empty or tourism_rating.empty or users.empty:
             # If dataframes are empty, fetch data from APIs
@@ -155,6 +161,19 @@ def recommend_tourism():
         print("Test dữ liệu")
         print(place_df)
         place_visited_by_user = df[df.id_user == user_id]
+
+        if len(place_visited_by_user) == 0:
+            random_recommendations = place_df.sample(n=5)
+            random_recommendations_json = random_recommendations.to_dict(
+                orient="records"
+            )
+
+            # json_data = (
+            #     json.dumps(random_recommendations_json, ensure_ascii=False)
+            #     .encode("utf-8")
+            #     .decode()
+            # )
+            return jsonify(random_recommendations_json)
 
         place_not_visited = place_df[
             ~place_df["id"].isin(place_visited_by_user["id_place"].values)
