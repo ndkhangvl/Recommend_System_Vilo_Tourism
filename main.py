@@ -10,6 +10,9 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 from tensorflow import keras
 import json
+import schedule
+import time
+import threading
 
 
 def content_based_recommendation_vietnamese(data, user_hashtags, num_recommendations=5):
@@ -23,21 +26,63 @@ def content_based_recommendation_vietnamese(data, user_hashtags, num_recommendat
     return recommended_objects
 
 
-loaded_model = keras.models.load_model("recommend_tourism")
+def fetch_data_from_apis():
+    global info_tourism, tourism_rating, users
+    try:
+        response_tour = requests.get("http://127.0.0.1:8000/api/recommend-place")
+        response_rating = requests.get("http://127.0.0.1:8000/api/recommend-rating")
+        response_user = requests.get("http://127.0.0.1:8000/api/recommend-user")
 
+        if (
+            response_tour.status_code == 200
+            and response_rating.status_code == 200
+            and response_user.status_code == 200
+        ):
+            tour_data = response_tour.json()
+            rating_data = response_rating.json()
+            user_data = response_user.json()
+
+            info_tourism = pd.DataFrame(tour_data)
+            tourism_rating = pd.DataFrame(rating_data)
+            users = pd.DataFrame(user_data)
+            print("Thành công")
+            print(info_tourism)
+            return info_tourism, tourism_rating, users
+        else:
+            app.logger.error("Failed to retrieve JSON data from the API.")
+            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+    except Exception as e:
+        app.logger.error(f"Error fetching data from APIs: {str(e)}")
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+
+
+loaded_model = keras.models.load_model("recommend_tourism")
 info_tourism = pd.DataFrame()
 tourism_rating = pd.DataFrame()
 users = pd.DataFrame()
+response_content = requests.get("http://127.0.0.1:8000/api/place")
+fetch_data_from_apis()
 
 
 app = Flask(__name__)
 
 
-@app.route("/", methods={"GET"})
-def home():
-    return "Xin chào tôi là ndkhangvl"
+# def scheduled_job():
+#     fetch_data_from_apis()
 
 
+# schedule.every(30).seconds.do(scheduled_job)
+
+
+# def run_schedule():
+#     while True:
+#         schedule.run_pending()
+#         time.sleep(1)
+
+
+# @app.before_first_request
+# def before_first_request():
+#     fetch_data_from_apis()
 @app.route("/test", methods=["GET"])
 def test():
     response = requests.get("http://127.0.0.1:8000/place")
@@ -53,7 +98,7 @@ def test():
 def recommend_tourism():
     try:
         # loaded_model = keras.models.load_model("recommend_tourism")
-        # print(loaded_model.summary())
+        print(loaded_model.summary())
         # response_tour = requests.get("http://127.0.0.1:8000/api/recommend-place")
         # response_rating = requests.get("http://127.0.0.1:8000/api/recommend-rating")
         # response_user = requests.get("http://127.0.0.1:8000/api/recommend-user")
@@ -79,6 +124,7 @@ def recommend_tourism():
             # If dataframes are empty, fetch data from APIs
             info_tourism, tourism_rating, users = fetch_data_from_apis()
 
+        # info_tourism, tourism_rating, users = fetch_data_from_apis()
         # info_tourism = pd.read_csv(f"./vilo_tour.csv")
         # tourism_rating = pd.read_csv(f"./rating_final.csv")
         # users = pd.read_csv(f"./vilo_user.csv")
@@ -155,8 +201,8 @@ def recommend_tourism():
 
         place_df = tourism_new
         # df = pd.read_csv(f"./rating_final.csv")
-        print("Test dữ liệu")
-        print(place_df)
+        # print("Test dữ liệu")
+        # print(place_df)
         place_visited_by_user = df[df.id_user == user_id]
 
         if len(place_visited_by_user) == 0:
@@ -182,7 +228,7 @@ def recommend_tourism():
 
         place_not_visited = [[place_to_place_encoded.get(x)] for x in place_not_visited]
 
-        print(len(place_not_visited))
+        # print(len(place_not_visited))
 
         if len(place_not_visited) == 0:
             random_recommendations = place_df.sample(n=5)
@@ -213,7 +259,7 @@ def recommend_tourism():
             for x in top_ratings_indices
         ]
 
-        print("Người dùng với lượt đánh giá cao")
+        # print("Người dùng với lượt đánh giá cao")
 
         top_place_user = (
             place_visited_by_user.sort_values(by="place_ratings", ascending=False)
@@ -234,51 +280,30 @@ def recommend_tourism():
         print(f"Lỗi: {str(e)}")
 
 
-def fetch_data_from_apis():
-    try:
-        response_tour = requests.get("http://127.0.0.1:8000/api/recommend-place")
-        response_rating = requests.get("http://127.0.0.1:8000/api/recommend-rating")
-        response_user = requests.get("http://127.0.0.1:8000/api/recommend-user")
-
-        if (
-            response_tour.status_code == 200
-            and response_rating.status_code == 200
-            and response_user.status_code == 200
-        ):
-            tour_data = response_tour.json()
-            rating_data = response_rating.json()
-            user_data = response_user.json()
-
-            info_tourism = pd.DataFrame(tour_data)
-            tourism_rating = pd.DataFrame(rating_data)
-            users = pd.DataFrame(user_data)
-
-            return info_tourism, tourism_rating, users
-        else:
-            app.logger.error("Failed to retrieve JSON data from the API.")
-            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-    except Exception as e:
-        app.logger.error(f"Error fetching data from APIs: {str(e)}")
-        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-
-
 @app.route("/recommend", methods=["POST"])
 def recommend():
-    response = requests.get("http://127.0.0.1:8000/place")
-
-    if response.status_code == 200:
-        data = response.json()
+    # response = requests.get("http://127.0.0.1:8000/api/place")
+    global response_content
+    if response_content.status_code == 200:
+        data = response_content.json()
         names = [item["name_place"] for item in data]
 
     user_hashtags = request.json["hashtags"]
+    print(user_hashtags)
     split_user_hashtags = [hashtag.split("_") for hashtag in user_hashtags]
     tokenized_user_hashtags = [
         word for hashtag in split_user_hashtags for word in hashtag
     ]
+    print(tokenized_user_hashtags)
     recommendations = content_based_recommendation_vietnamese(
         names, tokenized_user_hashtags
     )
-    return jsonify({"recommendations": recommendations})
+
+    recommended_data = [item for item in data if item["name_place"] in recommendations]
+    # print(recommended_data)
+    # data_as_dict = recommended_data.to_dict(orient="records")
+
+    return recommended_data
 
 
 @app.route("/recommend_content", methods=["POST"])
@@ -306,4 +331,4 @@ def recommend_content():
 
 
 if __name__ == "__main__":
-    app.run()
+    app.run(threaded=True)
