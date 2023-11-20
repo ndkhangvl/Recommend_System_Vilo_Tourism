@@ -18,12 +18,19 @@ import threading
 def content_based_recommendation_vietnamese(data, user_hashtags, num_recommendations=5):
     vectorizer = TfidfVectorizer()
     tfidf_matrix = vectorizer.fit_transform(data)
+    print("In nè")
+    print(tfidf_matrix)
     user_hashtags_str = " ".join(user_hashtags)
     user_hashtags_vector = vectorizer.transform([user_hashtags_str])
     similarity_scores = cosine_similarity(user_hashtags_vector, tfidf_matrix)
+    print("In số similar")
+    print(similarity_scores)
     recommended_indices = similarity_scores.argsort()[0][-num_recommendations:][::-1]
-    recommended_objects = [data[idx] for idx in recommended_indices]
-    return recommended_objects
+    recommend_object = recommended_indices + 1
+    final_recommend = [str(item) for item in recommend_object]
+    # recommended_objects = [data[idx] for idx in recommended_indices]
+    # print(recommended_objects)
+    return final_recommend
 
 
 def fetch_data_from_apis():
@@ -57,6 +64,7 @@ def fetch_data_from_apis():
 
 
 loaded_model = keras.models.load_model("recommend_tourism")
+loaded_model.summary()
 info_tourism = pd.DataFrame()
 tourism_rating = pd.DataFrame()
 users = pd.DataFrame()
@@ -286,7 +294,7 @@ def recommend():
     global response_content
     if response_content.status_code == 200:
         data = response_content.json()
-        names = [item["name_place"] for item in data]
+        names = [item["feature_place"] for item in data]
 
     user_hashtags = request.json["hashtags"]
     print(user_hashtags)
@@ -298,9 +306,17 @@ def recommend():
     recommendations = content_based_recommendation_vietnamese(
         names, tokenized_user_hashtags
     )
+    print("In cái ")
+    print(item for item in data if data["id_place"] in recommendations)
+    id_places_to_find = ["1", "2", "3"]
 
-    recommended_data = [item for item in data if item["name_place"] in recommendations]
-    # print(recommended_data)
+    # Tìm các phần tử trong danh sách data có giá trị "id_place" thuộc id_places_to_find
+    filtered_data = [item for item in data if item["id_place"] in id_places_to_find]
+
+    recommended_data = [item for item in data if item["id_place"] in recommendations]
+    # recommended_data = [{"id": item["id_place"]} for item in recommendations]
+
+    print(recommended_data)
     # data_as_dict = recommended_data.to_dict(orient="records")
 
     return recommended_data
